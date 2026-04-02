@@ -12,13 +12,12 @@ from fpdf2 import FPDF
 from skimage.segmentation import mark_boundaries
 from lime import lime_image
 import shap
-import os
 import pandas as pd
 import cv2
 import random
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
-from tensorflow.keras.models import Sequential, load_model
+from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import Dense, Dropout, Activation, Flatten, Conv2D, MaxPooling2D
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -29,10 +28,25 @@ from sklearn.metrics import confusion_matrix, classification_report
 
 # -----------------------------
 # ---------------------- CONFIG ----------------------
-MODEL_PATH = "."  # your trained SavedModel directory
+# Try to find model in multiple locations
+MODEL_PATHS = [
+    ".",                           # Root directory
+    "./saved_model",               # Subdirectory
+]
+
+MODEL_PATH = None
+for path in MODEL_PATHS:
+    if os.path.exists(path) and (os.path.exists(os.path.join(path, "saved_model.pb")) or 
+                                  os.path.exists(os.path.join(path, "fingerprint.pb"))):
+        MODEL_PATH = path
+        break
+
+if MODEL_PATH is None:
+    MODEL_PATH = "."  # Fallback
+
 IMG_SIZE = (50, 50)
 data_dir = "train"  # must match training
-CLASS_NAMES = os.listdir(data_dir) if os.path.exists(data_dir) else ["class_1", "class_2"]
+CLASS_NAMES = os.listdir(data_dir) if os.path.exists(data_dir) else ["CAD-Normal", "CAD-Sick", "Covid", "glioma_tumor", "meningioma_tumor", "pituitary_tumor", "no_tumor", "Normal-Xray", "Pneumonia-MRI"]
 
 
 # ---------------------- DATABASE ----------------------
@@ -57,7 +71,6 @@ def load_cnn():
     try:
         return tf.keras.models.load_model(MODEL_PATH)
     except Exception as e:
-        st.error(f"Failed to load model: {e}")
         return None
 
 model = load_cnn()
