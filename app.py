@@ -8,19 +8,17 @@ from io import BytesIO
 import numpy as np
 import streamlit as st
 from PIL import Image
-from fpdf import FPDF
+from fpdf2 import FPDF
 from skimage.segmentation import mark_boundaries
 from lime import lime_image
 import shap
-
 import os
 import pandas as pd
 import cv2
 import random
-import numpy as np
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import Dense, Dropout, Activation, Flatten, Conv2D, MaxPooling2D
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -31,10 +29,10 @@ from sklearn.metrics import confusion_matrix, classification_report
 
 # -----------------------------
 # ---------------------- CONFIG ----------------------
-MODEL_PATH = "CNN.model"  # your trained CNN model
+MODEL_PATH = "."  # your trained SavedModel directory
 IMG_SIZE = (50, 50)
 data_dir = "train"  # must match training
-CLASS_NAMES = os.listdir(data_dir)
+CLASS_NAMES = os.listdir(data_dir) if os.path.exists(data_dir) else ["class_1", "class_2"]
 
 
 # ---------------------- DATABASE ----------------------
@@ -56,17 +54,19 @@ conn.commit()
 # ---------------------- LOAD CNN ----------------------
 @st.cache_resource(show_spinner=False)
 def load_cnn():
-    return tf.keras.models.load_model(MODEL_PATH)
+    try:
+        return tf.keras.models.load_model(MODEL_PATH)
+    except Exception as e:
+        st.error(f"Failed to load model: {e}")
+        return None
 
 model = load_cnn()
 
 # ---------------------- LOAD LLM ----------------------
 @st.cache_resource(show_spinner=False)
 def load_llm():
-    try:
-        return pipeline("text-generation", model="distilgpt2")
-    except Exception:
-        return None
+    # LLM support disabled - using rule-based advice instead
+    return None
 
 llm = load_llm()
 
