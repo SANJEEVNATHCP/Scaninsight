@@ -194,6 +194,10 @@ else:  # Dashboard
     if not st.session_state["logged_in"]:
         st.warning("Please login first.")
     else:
+        if model is None:
+            st.error("❌ Model failed to load. Please check the model file and try again.")
+            st.stop()
+        
         username = st.session_state["username"]
         st.subheader(f"📊 Dashboard — Welcome {username}")
         
@@ -241,39 +245,46 @@ else:  # Dashboard
                 lime_vis = np.array(pil_img)
 
             # ----------------- SHAP Explanation -----------------
-            # ----------------- SHAP Explanation -----------------
             shap_transparency = st.slider("SHAP: Overlay transparency", 0.0, 1.0, 0.4, 0.05)
             try:
                 # collect only image files
                 image_extensions = (".png", ".jpg", ".jpeg")
                 background_paths = []
-                for root, dirs, files in os.walk(data_dir):
-                    for f in files:
-                        if f.lower().endswith(image_extensions):
-                            background_paths.append(os.path.join(root, f))
-                background_paths = background_paths[:20]
+                if os.path.exists(data_dir):
+                    for root, dirs, files in os.walk(data_dir):
+                        for f in files:
+                            if f.lower().endswith(image_extensions):
+                                background_paths.append(os.path.join(root, f))
+                    background_paths = background_paths[:20]
 
-                background = np.stack([preprocess_pil_image(Image.open(p)) for p in background_paths], axis=0)
-                explainer_shap = shap.GradientExplainer(model, background)
+                    if len(background_paths) > 0:
+                        background = np.stack([preprocess_pil_image(Image.open(p)) for p in background_paths], axis=0)
+                        explainer_shap = shap.GradientExplainer(model, background)
 
-                # Preprocess uploaded image
-                x_input = np.expand_dims(preprocess_pil_image(pil_img), axis=0)
-                shap_values = explainer_shap.shap_values(x_input)
+                        # Preprocess uploaded image
+                        x_input = np.expand_dims(preprocess_pil_image(pil_img), axis=0)
+                        shap_values = explainer_shap.shap_values(x_input)
 
-                # Create SHAP overlay
-                shap_map = np.sum(np.abs(shap_values[0][0]), axis=-1)  # shape: 50x50
-                shap_map = (shap_map - shap_map.min()) / (shap_map.max() - shap_map.min() + 1e-8)
-                shap_map = np.stack([shap_map]*3, axis=-1)  # make 3 channels
+                        # Create SHAP overlay
+                        shap_map = np.sum(np.abs(shap_values[0][0]), axis=-1)  # shape: 50x50
+                        shap_map = (shap_map - shap_map.min()) / (shap_map.max() - shap_map.min() + 1e-8)
+                        shap_map = np.stack([shap_map]*3, axis=-1)  # make 3 channels
 
-                # Resize SHAP map to match uploaded image size
-                shap_map_img = Image.fromarray((shap_map*255).astype(np.uint8)).resize(pil_img.size)
-                shap_map_resized = np.array(shap_map_img).astype(np.float32)/255.0
+                        # Resize SHAP map to match uploaded image size
+                        shap_map_img = Image.fromarray((shap_map*255).astype(np.uint8)).resize(pil_img.size)
+                        shap_map_resized = np.array(shap_map_img).astype(np.float32)/255.0
 
-                # Original image normalized
-                pil_img_arr = np.array(pil_img).astype(np.float32)/255.0
+                        # Original image normalized
+                        pil_img_arr = np.array(pil_img).astype(np.float32)/255.0
 
-                shap_image = (1-shap_transparency)*pil_img_arr + shap_transparency*shap_map_resized
-                shap_image = np.clip(shap_image, 0, 1)
+                        shap_image = (1-shap_transparency)*pil_img_arr + shap_transparency*shap_map_resized
+                        shap_image = np.clip(shap_image, 0, 1)
+                    else:
+                        st.info("SHAP requires training images in the 'train' directory.")
+                        shap_image = np.array(pil_img)
+                else:
+                    st.info("SHAP disabled: training data directory not found.")
+                    shap_image = np.array(pil_img)
 
             except Exception as e:
                 st.warning(f"SHAP explanation failed: {e}")
